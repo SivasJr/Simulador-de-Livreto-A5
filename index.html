@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador de Livreto A5</title>
+  <meta name="description" content="Abra um PDF A4, divida cada folha em duas páginas A5 e visualize como livreto diretamente no navegador." />
+  <style>
+    :root {
+      --bg: #07101f;
+      --panel: rgba(13, 27, 48, 0.88);
+      --panel-2: #101f35;
+      --line: rgba(255,255,255,.10);
+      --text: #f8fafc;
+      --muted: #9fb0c6;
+      --accent: #4d8dff;
+      --accent-2: #70a8ff;
+      --danger: #ff6b6b;
+      --success: #63d7a0;
+      --shadow: 0 26px 80px rgba(0,0,0,.34);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(77,141,255,.22), transparent 30%),
+        radial-gradient(circle at 90% 15%, rgba(82,62,255,.18), transparent 28%),
+        var(--bg);
+    }
+
+    button, select, input { font: inherit; }
+    button, select { color: inherit; }
+
+    .app {
+      width: min(1600px, 100%);
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .brand h1 {
+      margin: 0 0 6px;
+      font-size: clamp(24px, 2.2vw, 38px);
+      letter-spacing: -.035em;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .privacy-badge {
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255,255,255,.035);
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 350px) minmax(0, 1fr);
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .controls {
+      padding: 18px;
+      min-height: 680px;
+    }
+
+    .dropzone {
+      min-height: 185px;
+      border: 1.5px dashed rgba(112,168,255,.55);
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      text-align: center;
+      background: rgba(77,141,255,.07);
+      cursor: pointer;
+      transition: .2s ease;
+      outline: none;
+    }
+
+    .dropzone:hover,
+    .dropzone.dragover,
+    .dropzone:focus-visible {
+      border-color: var(--accent-2);
+      background: rgba(77,141,255,.12);
+      transform: translateY(-1px);
+    }
+
+    .drop-icon {
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 12px;
+      border-radius: 16px;
+      background: rgba(77,141,255,.16);
+      color: #bcd5ff;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .dropzone strong { display: block; font-size: 15px; }
+    .dropzone span { display: block; color: var(--muted); font-size: 12px; margin-top: 7px; line-height: 1.5; }
+
+    #fileInput { display: none; }
+
+    .file-info {
+      display: none;
+      margin-top: 12px;
+      padding: 12px 13px;
+      border-radius: 13px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.035);
+    }
+
+    .file-info.visible { display: block; }
+    .file-name { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+    .file-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .control-group {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .control-group label.group-label {
+      display: block;
+      font-size: 12px;
+      color: #d8e3f3;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: .02em;
+    }
+
+    .select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #10223d;
+      padding: 11px 12px;
+      border-radius: 12px;
+      outline: none;
+    }
+
+    .select:focus { border-color: rgba(112,168,255,.7); }
+
+    .switch-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-top: 13px;
+    }
+
+    .switch-row input { margin-top: 3px; accent-color: var(--accent); }
+    .switch-row strong { font-size: 13px; display: block; }
+    .switch-row small { color: var(--muted); display: block; line-height: 1.45; margin-top: 2px; }
+
+    .actions {
+      display: grid;
+      gap: 9px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      min-height: 44px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: .18s ease;
+      font-weight: 750;
+    }
+
+    .btn:hover:not(:disabled) { transform: translateY(-1px); background: rgba(255,255,255,.09); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn.primary { background: linear-gradient(135deg, var(--accent), #6c63ff); border-color: transparent; }
+    .btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+
+    .status {
+      min-height: 44px;
+      margin-top: 15px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .status.error { color: #ffb3b3; }
+    .status.success { color: #b9f2d6; }
+
+    .viewer-panel {
+      min-height: 680px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .viewer-toolbar {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.025);
+    }
+
+    .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+    .icon-btn {
+      min-width: 40px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.045);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+    }
+
+    .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .icon-btn:hover:not(:disabled) { background: rgba(255,255,255,.1); }
+
+    .page-counter {
+      min-width: 130px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .viewer {
+      position: relative;
+      flex: 1;
+      display: grid;
+      place-items: center;
+      padding: clamp(18px, 3vw, 44px);
+      overflow: auto;
+      background:
+        linear-gradient(rgba(255,255,255,.016) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.016) 1px, transparent 1px),
+        #081322;
+      background-size: 24px 24px;
+    }
+
+    .empty-state {
+      max-width: 540px;
+      text-align: center;
+      color: var(--muted);
+      padding: 30px;
+    }
+    .empty-state .big { font-size: 58px; line-height: 1; opacity: .65; margin-bottom: 14px; }
+    .empty-state strong { color: var(--text); display: block; margin-bottom: 7px; font-size: 18px; }
+
+    .book-wrap {
+      display: none;
+      position: relative;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      width: min(100%, 1120px);
+      min-height: 500px;
+      perspective: 1600px;
+      transform-origin: center center;
+      transition: transform .2s ease;
+    }
+
+    .book-wrap.visible { display: flex; }
+
+    .page-shell {
+      position: relative;
+      background: white;
+      width: min(42vw, 500px);
+      max-height: 74vh;
+      aspect-ratio: 148 / 210;
+      box-shadow: 0 20px 55px rgba(0,0,0,.33);
+      overflow: hidden;
+      isolation: isolate;
+      transition: transform .28s ease, opacity .28s ease;
+    }
+
+    .page-shell.left {
+      border-radius: 10px 2px 2px 10px;
+      transform-origin: right center;
+    }
+
+    .page-shell.right {
+      border-radius: 2px 10px 10px 2px;
+      transform-origin: left center;
+    }
+
+    .page-shell.single-left { visibility: hidden; }
+
+    .page-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .page-shell.left::after {
+      background: linear-gradient(90deg, transparent 76%, rgba(0,0,0,.07));
+    }
+
+    .page-shell.right::after {
+      background: linear-gradient(90deg, rgba(0,0,0,.09), transparent 24%);
+    }
+
+    .page-shell.turn-forward { animation: turnForward .32s ease; }
+    .page-shell.turn-back { animation: turnBack .32s ease; }
+
+    @keyframes turnForward {
+      0% { opacity: .55; transform: rotateY(-7deg) translateX(8px); }
+      100% { opacity: 1; transform: rotateY(0) translateX(0); }
+    }
+    @keyframes turnBack {
+      0% { opacity: .55; transform: rotateY(7deg) translateX(-8px); }
+      100% { opacity: 1; transform: rotateY(0) translateX(0); }
+    }
+
+    canvas.page-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: white;
+    }
+
+    .page-label {
+      position: absolute;
+      z-index: 4;
+      bottom: 8px;
+      padding: 4px 7px;
+      border-radius: 999px;
+      color: rgba(255,255,255,.85);
+      background: rgba(4,13,25,.62);
+      backdrop-filter: blur(6px);
+      font-size: 10px;
+      pointer-events: none;
+    }
+    .left .page-label { left: 8px; }
+    .right .page-label { right: 8px; }
+
+    .spine {
+      width: 10px;
+      align-self: stretch;
+      max-height: 74vh;
+      background: linear-gradient(90deg, rgba(0,0,0,.16), rgba(255,255,255,.05), rgba(0,0,0,.18));
+      box-shadow: 0 0 22px rgba(0,0,0,.22);
+      z-index: 5;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(7,16,31,.7);
+      backdrop-filter: blur(4px);
+      z-index: 10;
+    }
+    .loading-overlay.visible { display: grid; }
+    .loader {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.16);
+      border-top-color: #fff;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .zoom-label { color: var(--muted); font-size: 11px; min-width: 45px; text-align: center; }
+
+    .hint {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 980px) {
+      .app { padding: 16px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .layout { grid-template-columns: 1fr; }
+      .controls { min-height: 0; }
+      .viewer-panel { min-height: 620px; }
+      .page-shell { width: min(44vw, 430px); }
+    }
+
+    @media (max-width: 620px) {
+      .viewer-toolbar { flex-wrap: wrap; }
+      .toolbar-right { width: 100%; justify-content: center; }
+      .page-shell { width: min(43vw, 280px); }
+      .spine { width: 5px; }
+      .privacy-badge { white-space: normal; }
+      .viewer { padding: 18px 7px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>Simulador de Livreto A5</h1>
+        <p>Abra um PDF A4 já montado em frente e verso e simule a ordem real de leitura do livreto A5.</p>
+      </div>
+      <div class="privacy-badge">Processamento local: o PDF não é enviado para um servidor.</div>
+    </header>
+
+    <section class="layout">
+      <aside class="panel controls">
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Selecionar arquivo PDF">
+          <div>
+            <div class="drop-icon">PDF</div>
+            <strong>Arraste seu PDF A4 aqui</strong>
+            <span>ou clique para selecionar o arquivo<br>O processamento acontece no seu navegador.</span>
+          </div>
+        </div>
+        <input id="fileInput" type="file" accept="application/pdf,.pdf" />
+
+        <div id="fileInfo" class="file-info">
+          <div id="fileName" class="file-name"></div>
+          <div id="fileMeta" class="file-meta"></div>
+        </div>
+
+        <div class="control-group">
+          <label class="group-label" for="layoutMode">Como o PDF A4 está montado</label>
+          <select id="layoutMode" class="select">
+            <option value="booklet">Livreto frente/verso (recomendado)</option>
+            <option value="sequential">Metades já estão em sequência</option>
+          </select>
+          <div class="hint">No modo livreto: A4 1 = quarta capa + capa; A4 2 = versos; A4 3 = próxima folha externa; A4 4 = respectivo verso.</div>
+        </div>
+
+        <div class="control-group">
+          <label class="group-label" for="splitMode">Como dividir cada página A4</label>
+          <select id="splitMode" class="select">
+            <option value="auto">Automático pela orientação</option>
+            <option value="vertical">Esquerda + direita</option>
+            <option value="horizontal">Topo + base</option>
+          </select>
+          <div class="hint">Automático: A4 paisagem vira duas páginas A5 retrato; A4 retrato vira duas páginas A5 paisagem.</div>
+        </div>
+
+        <div class="control-group">
+          <label class="group-label" for="halfOrder">Posição da capa na primeira folha</label>
+          <select id="halfOrder" class="select">
+            <option value="normal">Padrão: quarta capa à esquerda + capa à direita</option>
+            <option value="reverse">Espelhado: capa à esquerda + quarta capa à direita</option>
+          </select>
+
+          <label class="switch-row">
+            <input id="singleCover" type="checkbox" checked />
+            <span>
+              <strong>Exibir a primeira página como capa</strong>
+              <small>A capa fica sozinha à direita; depois o livreto abre na ordem 2–3, 4–5, 6–7 etc.</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="processBtn" class="btn primary" disabled>Processar / atualizar livreto</button>
+          <button id="downloadBtn" class="btn" disabled>Baixar PDF dividido em A5</button>
+        </div>
+
+        <div id="status" class="status">Selecione um PDF para começar.</div>
+      </aside>
+
+      <section class="panel viewer-panel">
+        <div class="viewer-toolbar">
+          <div class="toolbar-left">
+            <button id="prevBtn" class="icon-btn" disabled aria-label="Página anterior">←</button>
+            <div id="pageCounter" class="page-counter">Nenhum livreto carregado</div>
+            <button id="nextBtn" class="icon-btn" disabled aria-label="Próxima página">→</button>
+          </div>
+          <div class="toolbar-right">
+            <button id="zoomOutBtn" class="icon-btn" disabled aria-label="Diminuir zoom">−</button>
+            <div id="zoomLabel" class="zoom-label">100%</div>
+            <button id="zoomInBtn" class="icon-btn" disabled aria-label="Aumentar zoom">+</button>
+            <button id="fitBtn" class="icon-btn" disabled aria-label="Restaurar zoom">1:1</button>
+          </div>
+        </div>
+
+        <div id="viewer" class="viewer">
+          <div id="emptyState" class="empty-state">
+            <div class="big">▣</div>
+            <strong>Seu livreto aparecerá aqui</strong>
+            Escolha um PDF A4. O simulador separa as duas metades e reconstrói a ordem de leitura do livreto.
+          </div>
+
+          <div id="bookWrap" class="book-wrap" aria-live="polite">
+            <div id="leftPage" class="page-shell left">
+              <canvas id="leftCanvas" class="page-canvas"></canvas>
+              <div id="leftLabel" class="page-label"></div>
+            </div>
+            <div class="spine"></div>
+            <div id="rightPage" class="page-shell right">
+              <canvas id="rightCanvas" class="page-canvas"></canvas>
+              <div id="rightLabel" class="page-label"></div>
+            </div>
+          </div>
+
+          <div id="loadingOverlay" class="loading-overlay"><div class="loader"></div></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+  <script>
+    (() => {
+      const pdfjsLib = window.pdfjsLib;
+      if (pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      }
+
+      const $ = (id) => document.getElementById(id);
+      const els = {
+        dropzone: $("dropzone"),
+        fileInput: $("fileInput"),
+        fileInfo: $("fileInfo"),
+        fileName: $("fileName"),
+        fileMeta: $("fileMeta"),
+        layoutMode: $("layoutMode"),
+        splitMode: $("splitMode"),
+        halfOrder: $("halfOrder"),
+        singleCover: $("singleCover"),
+        processBtn: $("processBtn"),
+        downloadBtn: $("downloadBtn"),
+        status: $("status"),
+        emptyState: $("emptyState"),
+        bookWrap: $("bookWrap"),
+        leftPage: $("leftPage"),
+        rightPage: $("rightPage"),
+        leftCanvas: $("leftCanvas"),
+        rightCanvas: $("rightCanvas"),
+        leftLabel: $("leftLabel"),
+        rightLabel: $("rightLabel"),
+        prevBtn: $("prevBtn"),
+        nextBtn: $("nextBtn"),
+        pageCounter: $("pageCounter"),
+        zoomOutBtn: $("zoomOutBtn"),
+        zoomInBtn: $("zoomInBtn"),
+        fitBtn: $("fitBtn"),
+        zoomLabel: $("zoomLabel"),
+        loadingOverlay: $("loadingOverlay")
+      };
+
+      const state = {
+        file: null,
+        bytes: null,
+        pdf: null,
+        sourcePages: [],
+        logicalPages: [],
+        spreads: [],
+        spreadIndex: 0,
+        zoom: 1,
+        renderToken: 0
+      };
+
+      function humanBytes(bytes) {
+        if (!bytes) return "0 B";
+        const units = ["B", "KB", "MB", "GB"];
+        const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        return `${(bytes / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${units[i]}`;
+      }
+
+      function setStatus(message, type = "") {
+        els.status.className = `status ${type}`.trim();
+        els.status.textContent = message;
+      }
+
+      function setBusy(busy) {
+        els.loadingOverlay.classList.toggle("visible", busy);
+        els.processBtn.disabled = busy || !state.file;
+        els.downloadBtn.disabled = busy || !state.pdf || !state.logicalPages.length;
+      }
+
+      function chooseSplit(width, height) {
+        if (els.splitMode.value === "vertical") return "vertical";
+        if (els.splitMode.value === "horizontal") return "horizontal";
+        return width >= height ? "vertical" : "horizontal";
+      }
+
+      function pageGeometry(source) {
+        const split = chooseSplit(source.width, source.height);
+        if (split === "vertical") {
+          return { split, cropWidth: source.width / 2, cropHeight: source.height };
+        }
+        return { split, cropWidth: source.width, cropHeight: source.height / 2 };
+      }
+
+      async function loadFile(file) {
+        if (!file || !/pdf$/i.test(file.name) && file.type !== "application/pdf") {
+          setStatus("Selecione um arquivo PDF válido.", "error");
+          return;
+        }
+
+        state.file = file;
+        state.bytes = new Uint8Array(await file.arrayBuffer());
+        state.pdf = null;
+        state.logicalPages = [];
+        state.spreads = [];
+        state.spreadIndex = 0;
+
+        els.fileInfo.classList.add("visible");
+        els.fileName.textContent = file.name;
+        els.fileMeta.textContent = humanBytes(file.size);
+        els.processBtn.disabled = false;
+        els.downloadBtn.disabled = true;
+        setStatus("Arquivo carregado. Processando o PDF...");
+        await processPdf();
+      }
+
+      async function processPdf() {
+        if (!state.bytes || !window.pdfjsLib) {
+          setStatus("Não foi possível carregar a biblioteca de PDF. Verifique sua conexão com a internet e recarregue a página.", "error");
+          return;
+        }
+
+        setBusy(true);
+        try {
+          state.pdf = await window.pdfjsLib.getDocument({ data: state.bytes.slice() }).promise;
+          state.sourcePages = [];
+
+          for (let i = 1; i <= state.pdf.numPages; i++) {
+            const page = await state.pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 1 });
+            state.sourcePages.push({
+              pageNumber: i,
+              width: viewport.width,
+              height: viewport.height,
+              rotation: viewport.rotation
+            });
+          }
+
+          buildLogicalPages();
+          buildSpreads();
+          state.spreadIndex = 0;
+          state.zoom = 1;
+          updateZoom();
+
+          els.emptyState.style.display = "none";
+          els.bookWrap.classList.add("visible");
+          els.prevBtn.disabled = false;
+          els.nextBtn.disabled = false;
+          els.zoomOutBtn.disabled = false;
+          els.zoomInBtn.disabled = false;
+          els.fitBtn.disabled = false;
+          els.downloadBtn.disabled = false;
+
+          await renderSpread("forward");
+          const modeText = els.layoutMode.value === "booklet" ? "reorganizada(s) na ordem real do livreto" : "dividida(s) em sequência";
+          setStatus(`${state.pdf.numPages} página(s) A4 ${modeText}: ${state.logicalPages.length} página(s) A5.`, "success");
+        } catch (error) {
+          console.error(error);
+          setStatus(`Erro ao abrir o PDF: ${error.message || "arquivo inválido ou protegido"}.`, "error");
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function buildLogicalPages() {
+        const logical = [];
+        const reverse = els.halfOrder.value === "reverse";
+        const bookletMode = els.layoutMode.value === "booklet";
+        const totalA5Pages = state.sourcePages.length * 2;
+
+        for (const source of state.sourcePages) {
+          const geometry = pageGeometry(source);
+          const halves = geometry.split === "vertical" ? ["left", "right"] : ["top", "bottom"];
+          if (reverse) halves.reverse();
+
+          if (bookletMode) {
+            // O PDF de origem já está imposto para impressão frente/verso.
+            // Exemplo com 8 páginas A5:
+            // A4 1 = [8 | 1], A4 2 = [2 | 7], A4 3 = [6 | 3], A4 4 = [4 | 5].
+            const isFrontSide = source.pageNumber % 2 === 1;
+            const sheetIndex = Math.floor((source.pageNumber - 1) / 2);
+            const pageNumbers = isFrontSide
+              ? [totalA5Pages - (sheetIndex * 2), (sheetIndex * 2) + 1]
+              : [(sheetIndex * 2) + 2, totalA5Pages - (sheetIndex * 2) - 1];
+
+            halves.forEach((half, index) => {
+              logical.push({
+                sourcePage: source.pageNumber,
+                sourceWidth: source.width,
+                sourceHeight: source.height,
+                split: geometry.split,
+                half,
+                cropWidth: geometry.cropWidth,
+                cropHeight: geometry.cropHeight,
+                label: pageNumbers[index]
+              });
+            });
+          } else {
+            for (const half of halves) {
+              logical.push({
+                sourcePage: source.pageNumber,
+                sourceWidth: source.width,
+                sourceHeight: source.height,
+                split: geometry.split,
+                half,
+                cropWidth: geometry.cropWidth,
+                cropHeight: geometry.cropHeight,
+                label: logical.length + 1
+              });
+            }
+          }
+        }
+
+        // No modo livreto, recoloca as metades na sequência humana de leitura: 1, 2, 3...
+        if (bookletMode) logical.sort((a, b) => a.label - b.label);
+        state.logicalPages = logical;
+      }
+
+      function buildSpreads() {
+        const pages = state.logicalPages;
+        const spreads = [];
+        let index = 0;
+
+        if (els.singleCover.checked && pages.length) {
+          spreads.push([null, pages[0]]);
+          index = 1;
+        }
+
+        for (; index < pages.length; index += 2) {
+          spreads.push([pages[index] || null, pages[index + 1] || null]);
+        }
+
+        state.spreads = spreads;
+      }
+
+      async function renderLogicalPage(logical, canvas, shell, labelEl) {
+        if (!logical) {
+          shell.style.visibility = "hidden";
+          labelEl.textContent = "";
+          return;
+        }
+
+        shell.style.visibility = "visible";
+        const ratio = logical.cropWidth / logical.cropHeight;
+        shell.style.aspectRatio = `${logical.cropWidth} / ${logical.cropHeight}`;
+
+        const page = await state.pdf.getPage(logical.sourcePage);
+        const baseViewport = page.getViewport({ scale: 1 });
+
+        const maxPixelWidth = 1000;
+        const renderScale = Math.max(1.35, Math.min(2.4, maxPixelWidth / logical.cropWidth));
+        const viewport = page.getViewport({ scale: renderScale });
+
+        const fullCanvas = document.createElement("canvas");
+        fullCanvas.width = Math.ceil(viewport.width);
+        fullCanvas.height = Math.ceil(viewport.height);
+        const fullCtx = fullCanvas.getContext("2d", { alpha: false });
+        fullCtx.fillStyle = "#ffffff";
+        fullCtx.fillRect(0, 0, fullCanvas.width, fullCanvas.height);
+
+        await page.render({ canvasContext: fullCtx, viewport }).promise;
+
+        let sx = 0, sy = 0, sw = fullCanvas.width, sh = fullCanvas.height;
+        if (logical.split === "vertical") {
+          sw = Math.floor(fullCanvas.width / 2);
+          sx = logical.half === "right" ? fullCanvas.width - sw : 0;
+        } else {
+          sh = Math.floor(fullCanvas.height / 2);
+          sy = logical.half === "bottom" ? fullCanvas.height - sh : 0;
+        }
+
+        canvas.width = sw;
+        canvas.height = sh;
+        const ctx = canvas.getContext("2d", { alpha: false });
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, sw, sh);
+        ctx.drawImage(fullCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+        labelEl.textContent = `p. ${logical.label}`;
+      }
+
+      async function renderSpread(direction = "forward") {
+        if (!state.spreads.length) return;
+        const token = ++state.renderToken;
+        const spread = state.spreads[state.spreadIndex];
+        const [left, right] = spread;
+
+        setBusy(true);
+        try {
+          els.leftPage.classList.remove("turn-forward", "turn-back");
+          els.rightPage.classList.remove("turn-forward", "turn-back");
+          void els.bookWrap.offsetWidth;
+          els.leftPage.classList.add(direction === "back" ? "turn-back" : "turn-forward");
+          els.rightPage.classList.add(direction === "back" ? "turn-back" : "turn-forward");
+
+          await Promise.all([
+            renderLogicalPage(left, els.leftCanvas, els.leftPage, els.leftLabel),
+            renderLogicalPage(right, els.rightCanvas, els.rightPage, els.rightLabel)
+          ]);
+
+          if (token !== state.renderToken) return;
+
+          const visiblePages = [left, right].filter(Boolean).map(p => p.label);
+          const label = visiblePages.length === 1
+            ? `Página ${visiblePages[0]} de ${state.logicalPages.length}`
+            : `Páginas ${visiblePages[0]}–${visiblePages[visiblePages.length - 1]} de ${state.logicalPages.length}`;
+          els.pageCounter.textContent = label;
+          els.prevBtn.disabled = state.spreadIndex === 0;
+          els.nextBtn.disabled = state.spreadIndex >= state.spreads.length - 1;
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function updateZoom() {
+        els.bookWrap.style.transform = `scale(${state.zoom})`;
+        els.zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`;
+      }
+
+      function rebuildFromOptions() {
+        if (!state.pdf) return;
+        buildLogicalPages();
+        buildSpreads();
+        state.spreadIndex = Math.min(state.spreadIndex, Math.max(0, state.spreads.length - 1));
+        renderSpread("forward");
+        const modeText = els.layoutMode.value === "booklet" ? "ordem de leitura do livreto" : "ordem sequencial";
+        setStatus(`${state.pdf.numPages} página(s) A4 → ${state.logicalPages.length} página(s) A5 (${modeText}).`, "success");
+      }
+
+      async function downloadSplitPdf() {
+        if (!state.bytes || !state.logicalPages.length || !window.PDFLib) {
+          setStatus("A biblioteca para gerar o PDF A5 não está disponível.", "error");
+          return;
+        }
+
+        setBusy(true);
+        setStatus("Gerando o PDF A5 no navegador...");
+        try {
+          const { PDFDocument } = window.PDFLib;
+          const src = await PDFDocument.load(state.bytes.slice(), { ignoreEncryption: false });
+          const out = await PDFDocument.create();
+          const indices = Array.from({ length: src.getPageCount() }, (_, i) => i);
+          const embedded = await out.embedPdf(state.bytes.slice(), indices);
+
+          for (const logical of state.logicalPages) {
+            const sourceIndex = logical.sourcePage - 1;
+            const srcPage = src.getPage(sourceIndex);
+            const { width, height } = srcPage.getSize();
+            const split = logical.split;
+            const embeddedPage = embedded[sourceIndex];
+
+            if (split === "vertical") {
+              const halfW = width / 2;
+              const page = out.addPage([halfW, height]);
+              const x = logical.half === "right" ? -halfW : 0;
+              page.drawPage(embeddedPage, { x, y: 0, width, height });
+            } else {
+              const halfH = height / 2;
+              const page = out.addPage([width, halfH]);
+              // PDF coordinates start at the bottom. Moving the full page down reveals its upper half.
+              const y = logical.half === "top" ? -halfH : 0;
+              page.drawPage(embeddedPage, { x: 0, y, width, height });
+            }
+          }
+
+          const outputBytes = await out.save();
+          const blob = new Blob([outputBytes], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const base = state.file.name.replace(/\.pdf$/i, "");
+          a.href = url;
+          a.download = `${base}_dividido_A5.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+          setStatus("PDF dividido em A5 gerado com sucesso.", "success");
+        } catch (error) {
+          console.error(error);
+          setStatus(`Não foi possível gerar o PDF A5: ${error.message || "erro desconhecido"}.`, "error");
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      els.dropzone.addEventListener("click", () => els.fileInput.click());
+      els.dropzone.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          els.fileInput.click();
+        }
+      });
+      els.fileInput.addEventListener("change", (e) => loadFile(e.target.files[0]));
+
+      ["dragenter", "dragover"].forEach(type => {
+        els.dropzone.addEventListener(type, (e) => {
+          e.preventDefault();
+          els.dropzone.classList.add("dragover");
+        });
+      });
+      ["dragleave", "drop"].forEach(type => {
+        els.dropzone.addEventListener(type, (e) => {
+          e.preventDefault();
+          els.dropzone.classList.remove("dragover");
+        });
+      });
+      els.dropzone.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
+
+      els.processBtn.addEventListener("click", processPdf);
+      els.downloadBtn.addEventListener("click", downloadSplitPdf);
+      els.layoutMode.addEventListener("change", rebuildFromOptions);
+      els.splitMode.addEventListener("change", rebuildFromOptions);
+      els.halfOrder.addEventListener("change", rebuildFromOptions);
+      els.singleCover.addEventListener("change", () => {
+        if (!state.pdf) return;
+        buildSpreads();
+        state.spreadIndex = 0;
+        renderSpread("forward");
+      });
+
+      els.prevBtn.addEventListener("click", () => {
+        if (state.spreadIndex <= 0) return;
+        state.spreadIndex--;
+        renderSpread("back");
+      });
+      els.nextBtn.addEventListener("click", () => {
+        if (state.spreadIndex >= state.spreads.length - 1) return;
+        state.spreadIndex++;
+        renderSpread("forward");
+      });
+
+      els.zoomInBtn.addEventListener("click", () => {
+        state.zoom = Math.min(1.6, +(state.zoom + .1).toFixed(2));
+        updateZoom();
+      });
+      els.zoomOutBtn.addEventListener("click", () => {
+        state.zoom = Math.max(.65, +(state.zoom - .1).toFixed(2));
+        updateZoom();
+      });
+      els.fitBtn.addEventListener("click", () => {
+        state.zoom = 1;
+        updateZoom();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (!state.spreads.length) return;
+        if (e.key === "ArrowLeft") els.prevBtn.click();
+        if (e.key === "ArrowRight") els.nextBtn.click();
+      });
+    })();
+  </script>
+</body>
+</html>
